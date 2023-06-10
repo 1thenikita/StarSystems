@@ -1,0 +1,42 @@
+﻿@page "/fetchdata"
+@inject HttpClient Http
+@using StarSystems.Shared
+
+<PageTitle>Прогноз погоды</PageTitle>
+
+<MudText Typo="Typo.h3" GutterBottom="true">Прогноз погоды</MudText>
+<MudText Class="mb-8">Этот компонент демонстрирует получение данных с сервера.</MudText>
+@if (forecasts == null)
+{
+    <MudProgressCircular Color="Color.Default" Indeterminate="true" />
+}
+else
+{
+    <MudTable Items="forecasts" Hover="true" SortLabel="Sort By" Elevation="0">
+        <HeaderContent>
+            <MudTh><MudTableSortLabel InitialDirection="SortDirection.Ascending" SortBy="new Func<WeatherForecast, object>(x=>x.Date)">Дата</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel SortBy="new Func<WeatherForecast, object>(x=>x.TemperatureC)">Темп. (C)</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel SortBy="new Func<WeatherForecast, object>(x=>x.TemperatureF)">Темп. (F)</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel SortBy="new Func<WeatherForecast, object>(x=>x.Summary!)">Вывод</MudTableSortLabel></MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Дата">@context.Date</MudTd>
+            <MudTd DataLabel="Темп. (C)">@context.TemperatureC</MudTd>
+            <MudTd DataLabel="Темп. (F)">@context.TemperatureF</MudTd>
+            <MudTd DataLabel="Вывод">@context.Summary</MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new int[]{50, 100}" />
+        </PagerContent>
+    </MudTable>
+}
+
+
+@code {
+    private WeatherForecast[]? forecasts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        forecasts = await Http.GetFromJsonAsync<WeatherForecast[]>("WeatherForecast");
+    }
+}

@@ -1,0 +1,160 @@
+﻿@page "/admin/starsystems"
+@using Refit
+
+
+<PageTitle>Звёздные системы</PageTitle>
+
+<MudGrid>
+    <MudItem xs="12">
+        <MudPaper Class="pa-2">
+            <MudButton StartIcon="@Icons.Material.Filled.Add"
+                       Color="@Color.Success"
+                       Href="admin/starsystems/create">
+                Добавить
+            </MudButton>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12">
+        <MudTable Items="@Models" Virtualize="true" Filter="new Func<StarSystemViewModel, bool>(FilterFuncInput)">
+            <ToolBarContent>
+                <MudText Typo="Typo.h6">Таблица</MudText>
+                <MudSpacer/>
+                <MudTextField @bind-Value="SearchString" Placeholder="Поиск" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"/>
+            </ToolBarContent>
+            <HeaderContent>
+                <MudTh>
+                    <MudTableSortLabel SortBy="new Func<StarSystemViewModel, object>(x => x.Name)">Название</MudTableSortLabel>
+                </MudTh>
+                <MudTh>
+                    <MudTableSortLabel SortBy="new Func<StarSystemViewModel, object>(x => x.Age)">Возраст</MudTableSortLabel>
+                </MudTh>
+                <MudTh>
+                    <MudTableSortLabel SortBy="new Func<StarSystemViewModel, object>(x => x.CenterOfMasses?.Name)">Центр масс</MudTableSortLabel>
+                </MudTh>
+                <MudTh>
+                    Действия
+                </MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>
+                    @context.Name
+                </MudTd>
+                <MudTd>
+                    @(context.Age)
+                </MudTd>
+                <MudTd>
+                    @if (context.CenterOfMasses != null)
+                    {
+                        <MudChip Icon="@Icons.Material.Filled.Person"
+                                 Href=@($"admin/spaceObjects/{context.CenterOfMasses?.ID}/edit")
+                                 Color="Color.Success"
+                                 Size="Size.Small">
+                            @(context.CenterOfMasses.Name)
+                        </MudChip>
+                    }
+                    else
+                    {
+                        <MudChip
+                            Size="Size.Small">
+                            не указан
+                        </MudChip>
+                    }
+                </MudTd>
+                <MudTd>
+                    <MudButton StartIcon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Warning" Href="@($"/admin/starsystems/{context.ID}/edit")">Изменить</MudButton>
+                    <MudButton StartIcon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="(() => OnDeleteModel(context))">Удалить</MudButton>
+                </MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager RowsPerPageString="Строк на странице:"/>
+            </PagerContent>
+        </MudTable>
+    </MudItem>
+</MudGrid>
+
+@code {
+
+    [Inject]
+    private ISnackbar Snackbar { get; set; }
+
+    [Inject]
+    private IDialogService DialogService { get; set; }
+
+    public List<StarSystemViewModel> ClearModels { get; set; } = new();
+    public List<StarSystemViewModel> Models { get; set; } = new();
+
+    public List<SpaceObjectViewModel> SpaceObjects { get; set; } = new();
+
+    [Inject]
+    public IStarSystemController ModelController { get; set; }
+
+    [Inject]
+    public ISpaceObjectController SpaceObjectController { get; set; }
+
+    public bool Loading { get; set; } = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDates();
+    }
+
+    private async Task LoadDates()
+    {
+        try
+        {
+            SpaceObjects = await SpaceObjectController.Get();
+
+            ClearModels = await ModelController.Get();
+            foreach (var spaceObject in ClearModels)
+            {
+                spaceObject.CenterOfMasses = SpaceObjects.FirstOrDefault(x => x.ID == spaceObject.CenterOfMassesID);
+            }
+
+            Models = ClearModels;
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add("Ошибка при загрузке данных.", Severity.Error);
+        }
+        Loading = false;
+    }
+
+    private async Task OnDeleteModel(StarSystemViewModel model)
+    {
+        var result = await DialogService.ShowMessageBox("Подтверждение",
+            $"Вы точно хотите удалить звёздную систему {model.Name}?", "Да", "Нет");
+
+        if (!result.GetValueOrDefault(false))
+        {
+            return;
+        }
+
+        try
+        {
+            await ModelController.Delete(model.ID);
+
+            await LoadDates();
+            Snackbar.Add("Звёздная система успешно удалена!", Severity.Success);
+        }
+        catch (ValidationApiException validationException)
+        {
+            Snackbar.Add(validationException.Content.Detail, Severity.Error);
+        }
+    }
+
+    private string SearchString = "";
+    private bool FilterFuncInput(StarSystemViewModel model) => FilterFunc(model, SearchString);
+
+    private bool FilterFunc(StarSystemViewModel model, string searchString)
+    {
+        if (string.IsNullOrWhiteSpace(searchString))
+            return true;
+        if (model.Age.ToString().Equals(searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+        if ($"{model.Name} {model.CenterOfMasses?.Name}"
+            .Contains(searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+        return false;
+    }
+
+}

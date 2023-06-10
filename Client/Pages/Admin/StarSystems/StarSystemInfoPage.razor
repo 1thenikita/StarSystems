@@ -1,0 +1,127 @@
+﻿@page "/admin/starsystems/{ID:guid}/info"
+
+@using Refit
+@using System.ComponentModel.DataAnnotations
+
+<PageTitle>Информация о звёздной системе</PageTitle>
+
+<MudGrid>
+    <MudItem xs="12">
+        <MudGrid>
+            <MudItem>
+                <MudFab DisableElevation="true"
+                        StartIcon="@Icons.Material.Filled.ArrowBack"
+                        Href="/admin/starsystems"/>
+            </MudItem>
+            <MudItem>
+                <MudText Typo="Typo.h3">@(Model.Name)</MudText>
+            </MudItem>
+        </MudGrid>
+    </MudItem>
+    <MudItem xs="12">
+        <MudPaper Elevation="2" Class="pa-4">
+            <MudGrid Class="d-flex align-center">
+                <MudItem>
+                    <MudButton StartIcon="@Icons.Material.Filled.Edit" 
+                               Size="Size.Small" Color="Color.Warning" 
+                               Href="@($"/admin/starsystems/{ID}/edit")">Изменить</MudButton>
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="4">
+        <MudPaper Elevation="2" Class="pa-4" Style="height: 200px;">
+            <MudText Typo="Typo.h4">
+                Общее кол-во:
+            </MudText>
+            @if (!Loading)
+            {
+                <MudChip Color="Color.Success">
+                    <MudText Typo="Typo.h5">@(SpaceObjects.Count)</MudText>
+                </MudChip>
+            }
+            else
+            {
+                <MudSkeleton SkeletonType="SkeletonType.Text"
+                             Width="160px" Height="40px"/>
+            }
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="8">
+        <MudTable Items="@SpaceObjects" Virtualize="true">
+            <ToolBarContent>
+                <MudText Typo="Typo.h6">Космические объекты</MudText>
+            </ToolBarContent>
+            <HeaderContent>
+                <MudTh>
+                    <MudTableSortLabel SortBy="new Func<SpaceObjectViewModel, object>(x => x.Name)">Название</MudTableSortLabel>
+                </MudTh>
+                <MudTh>
+                    <MudTableSortLabel SortBy="new Func<SpaceObjectViewModel, object>(x => x.Age)">Возраст</MudTableSortLabel>
+                </MudTh>
+                <MudTh>
+                    <MudTableSortLabel SortBy="new Func<SpaceObjectViewModel, object>(x => x.Type)">Тип</MudTableSortLabel>
+                </MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>
+                    <MudChip Icon="@Icons.Material.Filled.Person"
+                             Href=@($"admin/spaceObjects/{context.ID}/info")
+                             Size="Size.Small">
+                        @(context.Name)
+                    </MudChip>
+                </MudTd>
+                <MudTd>
+                    @(context.Age)
+                </MudTd>
+                <MudTd>
+                    @(context.Type.GetAttribute<DisplayAttribute>().Name)
+                </MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager RowsPerPageString="Строк на странице:"/>
+            </PagerContent>
+        </MudTable>
+    </MudItem>
+</MudGrid>
+
+@code {
+
+    [Inject]
+    public ISnackbar Snackbar { get; set; }
+
+    [Parameter]
+    public Guid ID { get; set; }
+
+    [Inject]
+    public IStarSystemController ModelController { get; set; }
+
+    [Inject]
+    public ISpaceObjectController SpaceObjectController { get; set; }
+
+    public StarSystemViewModel Model { get; set; } = new();
+    public List<SpaceObjectViewModel>? SpaceObjects { get; set; } = new();
+
+    private bool Loading { get; set; } = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await UpdateInfo();
+    }
+
+    private async Task UpdateInfo()
+    {
+        try
+        {
+            Model = await ModelController.GetByID(ID);
+            SpaceObjects = await SpaceObjectController.Get();
+            SpaceObjects = SpaceObjects.Where(x => x.StarSystemID == ID).ToList();
+        }
+        catch (ApiException e)
+        {
+            Snackbar.Add(e.ToString(), Severity.Error);
+        }
+        StateHasChanged();
+    }
+
+}
